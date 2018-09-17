@@ -20,27 +20,27 @@ queue_lk<string> cola;
 
 
 int main(int argc, char* argv[]) {
-    
+
     while (!validaCntHilos(hilosP)) {
         cout << "Hilos Productores: ";
         cin >> hilosP;
-        
+
         cout << "Hilos Consumidores: ";
         cin >> hilosC;
-        
+
     }
-    
+
 #pragma omp parallel num_threads(5)
     {
         if (omp_get_thread_num() < hilosP) {
             producir();
         }
         else {
-            while (insertado) {  }
+            while (insertado) {}
             consumir();
         }
     }
-    
+
     cout << endl;
     int l;
     cin >> l;
@@ -58,7 +58,7 @@ void producir() {
     dir += to_string(omp_get_thread_num());
     dir += ".txt";
     cout << dir << endl;
-    
+
     myfile.open(dir);
     while (getline(myfile, line)) {
         cola.set_lock();
@@ -67,18 +67,18 @@ void producir() {
         cola.unset_lock();
         insertado = true;
     }
-    
+
 }
 
 void consumir() {
     while(!cola.empty()) { // significa que ya almenos un hilo escribio en la cola.
-        
+
         cola.set_lock();
         queue_lk<string>::msg_t<string> s = cola.front();
         cola.pop();
         cola.unset_lock();
         int i = 0;
-        
+
 #pragma omp critical
         {
             cout << "Hilo " << omp_get_thread_num() << ": " << endl;
