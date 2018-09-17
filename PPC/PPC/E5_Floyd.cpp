@@ -7,7 +7,9 @@
 using namespace std;
 
 void leeAdyacencias(ifstream& ae, vector< vector< int > >& ma, int& cntVertices);
-void algoritmoFloydWarshall(const vector< vector< int > >& ma, vector< vector< int > >& mc, int& cntVertices);
+void algoritmoFloydWarshall_1(const vector< vector< int > >& ma, vector< vector< int > >& mc, int& cntVertices);
+void algoritmoFloydWarshall_2(const vector< vector< int > >& ma, vector< vector< int > >& mc, int& cntVertices);
+void algoritmoFloydWarshall_3(const vector< vector< int > >& ma, vector< vector< int > >& mc, int& cntVertices);
 
 int main() {
     string nombreArchivoEntrada = "/Users/Berta/Documents/GitHub/Parallel-and-Concurrent-Programming/PPC/PPC/gpequenyo.txt"; // formato *.txt, por ejemplo "grafo.txt
@@ -38,7 +40,7 @@ int main() {
     steady_clock::time_point t1 = steady_clock::now();
     
     // se genera la matriz de costos
-    algoritmoFloydWarshall(matrizAdyacencias, matrizCostos);
+    algoritmoFloydWarshall_1(matrizAdyacencias, matrizCostos, cntVertices);
     
     // se toma otra marca de tiempo
     steady_clock::time_point t2 = steady_clock::now();
@@ -61,7 +63,6 @@ int main() {
 void leeAdyacencias(ifstream& ae, vector< vector< int > >& ma, int& cntVertices) {
     int pe;
     char finLinea = ' ';
-    int contadorLineas = 0;
     
     ae >> cntVertices; // el primer número del archivo es la cantidad de vértices
     vector< int > v;
@@ -88,25 +89,141 @@ void leeAdyacencias(ifstream& ae, vector< vector< int > >& ma, int& cntVertices)
     }
 }
 
-void algoritmoFloydWarshall(const vector< vector< int > >& ma, vector< vector< int > >& mc, int & cntVertices) {
+void algoritmoFloydWarshall_1(const vector< vector< int > >& ma, vector< vector< int > >& mc, int & cntVertices) {
     int pe;
     char finLinea = ' ';
-    int contadorLineas = 0;
+    ifstream ae;
     
     ae >> cntVertices; // el primer número del archivo es la cantidad de vértices
     vector< int > v;
     v.resize(cntVertices, INT_MAX);
-    ma.resize(cntVertices, v);
+    mc.resize(cntVertices, v);
     
     ae.get(); // consume un blanco
     finLinea = ae.peek(); // intenta leer fin de línea
     
+    ae >> pe;
+    for (int i = 0; i < cntVertices; ++i) {
+        for (int j = 0; j < cntVertices; ++j) {
+            mc[i][j] = ma[i][j];
+        }
+    }
+
+    #pragma omp_set_nested(1)
+    #pragma omp parallel for num_threads(2)
+    {
+        for (int k = 1; k < cntVertices; ++k) {
+            for (int i = 1; i < cntVertices; ++i) {
+                for (int j = 1; j < cntVertices; ++j) {
+                    if ((mc[i][k] != INT_MAX) && (mc[j][k] != INT_MAX)) {
+                        if (mc[i][j] > mc[i][j] + mc[k][j]) {
+                            mc[i][j] = mc[i][j] + mc[k][j];
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void algoritmoFloydWarshall_2(const vector< vector< int > >& ma, vector< vector< int > >& mc, int & cntVertices) {
+    int pe;
+    char finLinea = ' ';
+    ifstream ae;
+    
+    ae >> cntVertices; // el primer número del archivo es la cantidad de vértices
+    vector< int > v;
+    v.resize(cntVertices, INT_MAX);
+    mc.resize(cntVertices, v);
+    
+    ae.get(); // consume un blanco
+    finLinea = ae.peek(); // intenta leer fin de línea
+    
+    ae >> pe;
     for (int i = 0; i < cntVertices; ++i) {
         for (int j = 0; j < cntVertices; ++j) {
             mc[i][j] = ma[i][j];
         }
     }
     
+#pragma omp_set_nested(1)
+    for (int k = 1; k < cntVertices; ++k) {
+        #pragma omp parallel for num_threads(4)
+        {
+            for (int i = 1; i < cntVertices; ++i) {
+                for (int j = 1; j < cntVertices; ++j) {
+                    if ((mc[i][k] != INT_MAX) && (mc[j][k] != INT_MAX)) {
+                        if (mc[i][j] > mc[i][j] + mc[k][j]) {
+                            mc[i][j] = mc[i][j] + mc[k][j];
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
+
+void algoritmoFloydWarshall_3(const vector< vector< int > >& ma, vector< vector< int > >& mc, int & cntVertices) {
+    int pe;
+    char finLinea = ' ';
+    ifstream ae;
+    
+    ae >> cntVertices; // el primer número del archivo es la cantidad de vértices
+    vector< int > v;
+    v.resize(cntVertices, INT_MAX);
+    mc.resize(cntVertices, v);
+    
+    ae.get(); // consume un blanco
+    finLinea = ae.peek(); // intenta leer fin de línea
+    
+    ae >> pe;
+    for (int i = 0; i < cntVertices; ++i) {
+        for (int j = 0; j < cntVertices; ++j) {
+            mc[i][j] = ma[i][j];
+        }
+    }
+    
+#pragma omp_set_nested(1)
+    #pragma omp parallel for num_threads(2)
+    {
+        for (int k = 1; k < cntVertices; ++k) {
+            #pragma omp parallel for num_threads(2)
+            {
+                for (int i = 1; i < cntVertices; ++i) {
+                    #pragma omp parallel for num_threads(2)
+                    {
+                        for (int j = 1; j < cntVertices; ++j) {
+                            if ((mc[i][k] != INT_MAX) && (mc[j][k] != INT_MAX)) {
+                                if (mc[i][j] > mc[i][j] + mc[k][j]) {
+                                    mc[i][j] = mc[i][j] + mc[k][j];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
