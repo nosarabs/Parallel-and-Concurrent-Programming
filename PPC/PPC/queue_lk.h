@@ -92,25 +92,25 @@ int queue_lk< T >::size() const {
 	return enqueued - dequeued;
 }
 
-//template < typename T >
-//typename queue_lk< T >::msg_t < T >& queue_lk< T >::front() {
-//    return q.front();
-//}
-//
-//template < typename T >
-//typename queue_lk< T >::msg_t < T > queue_lk< T >::front() const {
-//    return q.front();
-//}
-//
-//template < typename T >
-//typename queue_lk< T >::msg_t < T >& queue_lk< T >::back() {
-//    return q.back();
-//}
-//
-//template < typename T >
-//typename queue_lk< T >::msg_t < T > queue_lk< T >::back() const {
-//    return q.back();
-//}
+template < typename T >
+typename queue_lk< T >::msg_t < T >& queue_lk< T >::front() {
+    return q.front();
+}
+
+template < typename T >
+typename queue_lk< T >::msg_t < T > queue_lk< T >::front() const {
+    return q.front();
+}
+
+template < typename T >
+typename queue_lk< T >::msg_t < T >& queue_lk< T >::back() {
+    return q.back();
+}
+
+template < typename T >
+typename queue_lk< T >::msg_t < T > queue_lk< T >::back() const {
+    return q.back();
+}
 
 template < typename T >
 void queue_lk< T >::push(const msg_t < T >& msg_val) {
