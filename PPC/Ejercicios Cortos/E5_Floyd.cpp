@@ -12,7 +12,7 @@ void algoritmoFloydWarshall_2(const vector< vector< int > >& ma, vector< vector<
 void algoritmoFloydWarshall_3(const vector< vector< int > >& ma, vector< vector< int > >& mc, int& cntVertices);
 
 int main() {
-    string nombreArchivoEntrada = "/Users/Berta/Documents/GitHub/Parallel-and-Concurrent-Programming/PPC/PPC/gpequenyo.txt"; // formato *.txt, por ejemplo "grafo.txt
+    string nombreArchivoEntrada = "/Users/Berta/Documents/GitHub/Parallel-and-Concurrent-Programming/PPC/PPC/gmediano.txt"; // formato *.txt, por ejemplo "grafo.txt
     string nombreArchivoSalida = "/Users/Berta/Documents/GitHub/Parallel-and-Concurrent-Programming/PPC/PPC/out.txt";  // formato *.txt, por ejemplo matriz_costos.txt
     ifstream archivoEntrada(nombreArchivoEntrada, ios::in);
     ofstream archivoSalida(nombreArchivoSalida, ios::out);
@@ -28,21 +28,19 @@ int main() {
     
     // se cargan y despliegan las adyacencias del archivo
     leeAdyacencias(archivoEntrada, matrizAdyacencias, cntVertices);
-    cout << "MATRIZ DE ADYACENCIAS" << endl;
-    for (int i = 0; i < cntVertices; i++) {
-        for (int j = 0; j < cntVertices; j++)
-            cout << matrizAdyacencias[i][j] << ',';
-        cout << endl;
-    }
+//    cout << "MATRIZ DE ADYACENCIAS" << endl;
+//    for (int i = 0; i < cntVertices; i++) {
+//        for (int j = 0; j < cntVertices; j++)
+//            cout << matrizAdyacencias[i][j] << ',';
+//        cout << endl;
+//    }
     
     // se toma una marca de tiempo:
     using namespace std::chrono;
     steady_clock::time_point t1 = steady_clock::now();
     
     // se genera la matriz de costos
-    algoritmoFloydWarshall_1(matrizAdyacencias, matrizCostos, cntVertices);
-    //algoritmoFloydWarshall_2(matrizAdyacencias, matrizCostos, cntVertices);
-    //algoritmoFloydWarshall_3(matrizAdyacencias, matrizCostos, cntVertices);
+    algoritmoFloydWarshall_3(matrizAdyacencias, matrizCostos, cntVertices);
     
     // se toma otra marca de tiempo
     steady_clock::time_point t2 = steady_clock::now();
@@ -53,12 +51,12 @@ int main() {
     std::cout << std::endl;
     
     // se despliega la matriz de costos:
-    cout << endl << "MATRIZ DE COSTOS" << endl;
-    for (int i = 0; i < cntVertices; i++) {
-        for (int j = 0; j < cntVertices; j++)
-            cout << matrizCostos[i][j] << ',';
-        cout << endl;
-    }
+//    cout << endl << "MATRIZ DE COSTOS" << endl;
+//    for (int i = 0; i < cntVertices; i++) {
+//        for (int j = 0; j < cntVertices; j++)
+//            cout << matrizCostos[i][j] << ',';
+//        cout << endl;
+//    }
     cin.ignore(); // para que la consola no se cierre sin ver los resultados al ejecutar desde Visual Studio
 }
 
