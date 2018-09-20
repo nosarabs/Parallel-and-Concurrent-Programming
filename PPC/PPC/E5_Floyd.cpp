@@ -41,6 +41,8 @@ int main() {
     
     // se genera la matriz de costos
     algoritmoFloydWarshall_1(matrizAdyacencias, matrizCostos, cntVertices);
+    //algoritmoFloydWarshall_2(matrizAdyacencias, matrizCostos, cntVertices);
+    //algoritmoFloydWarshall_3(matrizAdyacencias, matrizCostos, cntVertices);
     
     // se toma otra marca de tiempo
     steady_clock::time_point t2 = steady_clock::now();
@@ -110,7 +112,7 @@ void algoritmoFloydWarshall_1(const vector< vector< int > >& ma, vector< vector<
     }
 
     #pragma omp_set_nested(1)
-    #pragma omp parallel for num_threads(2)
+    #pragma omp parallel for num_threads(1)
     {
         for (int k = 1; k < cntVertices; ++k) {
             for (int i = 1; i < cntVertices; ++i) {
@@ -147,14 +149,17 @@ void algoritmoFloydWarshall_2(const vector< vector< int > >& ma, vector< vector<
     }
     
 #pragma omp_set_nested(1)
-    for (int k = 1; k < cntVertices; ++k) {
-        #pragma omp parallel for num_threads(4)
-        {
-            for (int i = 1; i < cntVertices; ++i) {
-                for (int j = 1; j < cntVertices; ++j) {
-                    if ((mc[i][k] != INT_MAX) && (mc[j][k] != INT_MAX)) {
-                        if (mc[i][j] > mc[i][j] + mc[k][j]) {
-                            mc[i][j] = mc[i][j] + mc[k][j];
+    #pragma omp parallel for num_threads(2)
+    {
+        for (int k = 1; k < cntVertices; ++k) {
+            #pragma omp parallel for num_threads(2)
+            {
+                for (int i = 1; i < cntVertices; ++i) {
+                    for (int j = 1; j < cntVertices; ++j) {
+                        if ((mc[i][k] != INT_MAX) && (mc[j][k] != INT_MAX)) {
+                            if (mc[i][j] > mc[i][j] + mc[k][j]) {
+                                mc[i][j] = mc[i][j] + mc[k][j];
+                            }
                         }
                     }
                 }
