@@ -1,4 +1,4 @@
-#ifendef PPC_GoL_S // Programación Paralela y Concurrente - Conway's Game of Life
+#ifndef PPC_GoL_S // Programación Paralela y Concurrente - Conway's Game of Life
 #define PPC_GoL_S
 
 #include <iostream>
@@ -7,13 +7,13 @@ using namespace std;
 #include "Persona.h"
 
 class Simulador {
-    
+
 public:
     Simulador();
     ~Simulador();
-    
+
     void init();
-    
+
 private:
     int cantidadPersonas;
     int potenciaVirus;
@@ -21,11 +21,9 @@ private:
     int probaMuerte;
     int ogInfectada;
     int tam;
-    int duracion;
-    
-    
-}
+    int tics;
+
+
+};
 
 #endif
-
-
