@@ -1,215 +1,320 @@
+/* Archivo:      mpi_plantilla.cpp
+* Propósito:   ....
+*
+* Compilación:   mpicxx -g -Wall -o mpi_plantilla mpi_plantilla.cpp
+* Ejecución:     mpiexec -n <num_proc> ./mpi_plantilla <secuencia de valores de parámetros>
+*
+* Entradas:     ...
+* Salidas:    ...
+*
+* Notas:
+* 1.  bandera DEBUG produce salida detallada para depuración.
+*
+*/
+
 #include <mpi.h>
- #include <iostream>
- #include <stdlib.h>
- #include <iostream>
- #include <vector>
- #include <string>
- #include <chrono> // para medir el tiempo de ejecución
- using namespace std;
+#include <iostream>
+#include <stdlib.h>
+#include <vector>
+#include <string>
+#include <chrono> // para medir el tiempo de ejecución
+#include <omp.h>
 
- //#define DEBUG
+using namespace std;
 
- void uso(string nombre_prog);
+//#define DEBUG
 
- void gen_data(
-               float   min_meas    /* in  */,
-               float   max_meas    /* in  */,
-               vector<float>&   data /* out */,
-               int     data_count  /* in  */);
+void uso(string nombre_prog);
 
- void gen_bins(
-               float min_meas      /* in  */,
-               float max_meas      /* in  */,
-               vector<float>& bin_maxes   /* out */,
-               vector<int>&   bin_counts  /* out */,
-               int   bin_count     /* in  */);
+void gen_data(
+              float   min_meas    /* in  */,
+              float   max_meas    /* in  */,
+              vector<float>&   data /* out */,
+              int     data_count  /* in  */);
 
- int which_bin(
-               float    data         /* in */,
-               vector<float>&    bin_maxes  /* in */,
-               int      bin_count    /* in */,
-               float    min_meas     /* in */);
+void gen_bins(
+              float min_meas      /* in  */,
+              float max_meas      /* in  */,
+              vector<float>& bin_maxes   /* out */,
+              vector<int>&   bin_counts  /* out */,
+              int   bin_count     /* in  */);
 
- void print_histo(
-                  vector<float>    bin_maxes   /* in */,
-                  vector<int>     bin_counts   /* in */,
-                  int      bin_count     /* in */,
-                  float    min_meas      /* in */);
+int which_bin(
+              float    data         /* in */,
+              vector<float>&    bin_maxes  /* in */,
+              int      bin_count    /* in */,
+              float    min_meas     /* in */);
 
- void obt_args(
- 	char*    argv[]        /* in  */,
- 	int&     dato_salida  /* out */);
- @@ -29,7 +59,14 @@ int main(int argc, char* argv[]) {
- 	int cnt_proc; // cantidad de procesos
- 	MPI_Status mpi_status; // para capturar estado al finalizar invocación de funciones MPI
+void print_histo(
+                 vector<float>    bin_maxes   /* in */,
+                 vector<int>     bin_counts   /* in */,
+                 int      bin_count     /* in */,
+                 float    min_meas      /* in */);
 
- 	/* Arrancar ambiente MPI */
- 	int bin_count, bin;          // cantidad de bins, bin actual, bin == rango
- 	float min_meas, max_meas; // valor inferior de datos, valor superior de datos
- 	vector<float> bin_maxes;  // vector de m�ximos por bin
- 	vector<int> bin_counts;   // vector para contar valores por bin
- 	int data_count;              // cantidad de datos
- 	vector<float> data;          // vector de datos
+void get_input(int, int, int, int, float, float);
 
- 						   /* Arrancar ambiente MPI */
- 	MPI_Init(&argc, &argv);             		/* Arranca ambiente MPI */
- 	MPI_Comm_rank(MPI_COMM_WORLD, &mid); 		/* El comunicador le da valor a id (rank del proceso) */
- 	MPI_Comm_size(MPI_COMM_WORLD, &cnt_proc);  /* El comunicador le da valor a p (número de procesos) */
- @@ -42,6 +79,24 @@ int main(int argc, char* argv[]) {
+void obt_args(
+              char*    argv[]        /* in  */,
+              int&     bin_count_p   /* out */,
+              float&   min_meas_p    /* out */,
+              float&   max_meas_p    /* out */,
+              int&     data_count_p  /* out */);
 
- 	/* ejecución del proceso principal */
+//void obt_args(
+//	char*    argv[]        /* in  */,
+//	int&     dato_salida  /* out */);
 
- 	/* Allocate arrays needed */
+int main(int argc, char* argv[]) {
+	using namespace std::chrono;
 
- 	//bin_maxes.resize(bin_count);
- 	//bin_counts.resize(bin_count);
- 	//data.resize(data_count);
+	int mid; // id de cada proceso
+	int cnt_proc; // cantidad de procesos
+	MPI_Status mpi_status; // para capturar estado al finalizar invocación de funciones MPI
 
- 	///* Generate the data */
- 	//gen_data(min_meas, max_meas, data, data_count);
+	int bin_count, bin;          // cantidad de bins, bin actual, bin == rango
+	float min_meas, max_meas;	// valor inferior de datos, valor superior de datos
+	int data_count;              // cantidad de datos
+	vector<float> bin_maxes;	// vector de m�ximos por bin
+	vector<int> bin_counts;		// vector para contar valores por bin
+	vector<int> bin_countsTotal;
+	vector<float> data;          // vector de datos
 
- 	///* Create bins for storing counts */
- 	//gen_bins(min_meas, max_meas, bin_maxes, bin_counts, bin_count);
+						   /* Arrancar ambiente MPI */
+	MPI_Init(&argc, &argv);             		/* Arranca ambiente MPI */
+	MPI_Comm_rank(MPI_COMM_WORLD, &mid); 		/* El comunicador le da valor a id (rank del proceso) */
+	MPI_Comm_size(MPI_COMM_WORLD, &cnt_proc);  /* El comunicador le da valor a p (número de procesos) */
 
- 	///* Count number of values in each bin */
- 	//for (int i = 0; i < data_count; i++) {
- 	//	bin = which_bin(data[i], bin_maxes, bin_count, min_meas);
- 	//	bin_counts[bin]++;
- 	//}
+#  ifdef DEBUG
+	if (mid == 0)
+		cin.ignore();
+	MPI_Barrier(MPI_COMM_WORLD);
+#  endif
 
- 	/* finalización de la ejecución paralela */
- 	if (mid == 0)
- 		cin.ignore();
- @@ -83,3 +138,132 @@ void obt_args(
- 	cout << "dato_salida = " << dato_salida << endl;
- #  endif
- }  /* obt_args */
+	/* ejecución del proceso principal */
 
-    /*---------------------------------------------------------------------
-     * Function:  gen_data
-     * Purpose:   Generate random floats in the range min_meas <= x < max_meas
-     * In args:   min_meas:    the minimum possible value for the data
-     *            max_meas:    the maximum possible value for the data
-     *            data_count:  the number of measurements
-     * Out arg:   data:        the actual measurements
-     */
-    void gen_data(
-                  float   min_meas    /* in  */,
-                  float   max_meas    /* in  */,
-                  vector<float>&   data /* out */,
-                  int     data_count  /* in  */) {
+	    /* Check and get command line args */
+	if (!mid) {
+		if (argc != 5) uso(argv[0]);
+		obt_args(argv, bin_count, min_meas, max_meas, data_count);
+		data_count = data_count / cnt_proc;
+		bin_countsTotal.resize(bin_count);
+	}
 
-        srand(0);
+	/* Allocate arrays needed */
+	get_input(mid, cnt_proc, bin_count, data_count, min_meas, max_meas);
+	bin_maxes.resize(bin_count);
+	bin_counts.resize(bin_count);
+	data.resize(data_count);
 
-    #pragma omp parallel for num_threads(hilos)
-        {
-            for (int i = 0; i < data_count; i++)
-                data[i] = min_meas + (max_meas - min_meas)*rand() / ((double)RAND_MAX);
-        }
+	gen_data(min_meas, max_meas, data, data_count);
+	gen_bins(min_meas, max_meas, bin_maxes, bin_counts, bin_count);
 
+	for (int i = 0; i < data_count; i++) {
+		bin = which_bin(data[i], bin_maxes, bin_count, min_meas);
+		bin_counts[bin]++;
+	}
 
+	MPI_Reduce(&bin_counts, &bin_countsTotal, data_count, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
-    }  /* gen_data */
+	if (!mid) {
+		print_histo(bin_maxes, bin_countsTotal, bin_count, min_meas);
+	}
 
-    /*---------------------------------------------------------------------
-     * Function:  gen_bins
-     * Purpose:   Compute max value for each bin, and store 0 as the
-     *            number of values in each bin
-     * In args:   min_meas:   the minimum possible measurement
-     *            max_meas:   the maximum possible measurement
-     *            bin_count:  the number of bins
-     * Out args:  bin_maxes:  the maximum possible value for each bin
-     *            bin_counts: the number of data values in each bin
-     */
-    void gen_bins(
-                  float min_meas      /* in  */,
-                  float max_meas      /* in  */,
-                  vector<float>& bin_maxes   /* out */,
-                  vector<int>&   bin_counts  /* out */,
-                  int   bin_count     /* in  */) {
-        float bin_width;
+	/* finalización de la ejecución paralela */
+	if (mid == 0)
+		cin.ignore();
+	MPI_Barrier(MPI_COMM_WORLD); // para sincronizar la finalización de los procesos
 
-        bin_width = (max_meas - min_meas) / bin_count;
+	MPI_Finalize();
+	return 0;
+}  /* main */
 
-        for (int i = 0; i < bin_count; i++) {
-            bin_maxes[i] = min_meas + (i + 1)*bin_width;
-            bin_counts[i] = 0;
-        }
+	/*------------------------------------------------------------------------
+    * Function:  gen_data
+    * Purpose:   Generate random floats in the range min_meas <= x < max_meas
+    * In args:   min_meas:    the minimum possible value for the data
+    *            max_meas:    the maximum possible value for the data
+    *            data_count:  the number of measurements
+    * Out arg:   data:        the actual measurements
+    */
+   void gen_data(
+                 float   min_meas    /* in  */,
+                 float   max_meas    /* in  */,
+                 vector<float>&   data /* out */,
+                 int     data_count  /* in  */) {
 
-    #  ifdef DEBUG
-        cout << "bin_maxes = ";
-        for (int i = 0; i < bin_count; i++)
-            cout << " " << bin_maxes[i];
-        cout << endl;
-    #  endif
-    }  /* gen_bins */
+       srand(0);
 
-    /*---------------------------------------------------------------------
-     * Function:  which_bin
-     * Purpose:   Use binary search to determine which bin a measurement
-     *            belongs to
-     * In args:   data:       the current measurement
-     *            bin_maxes:  list of max bin values
-     *            bin_count:  number of bins
-     *            min_meas:   the minimum possible measurement
-     * Return:    the number of the bin to which data belongs
-     * Notes:
-     * 1.  The bin to which data belongs satisfies
-     *
-     *            bin_maxes[i-1] <= data < bin_maxes[i]
-     *
-     *     where, bin_maxes[-1] = min_meas
-     * 2.  If the search fails, the function prints a message and exits
-     */
-    int which_bin(
-                  float    data         /* in */,
-                  vector<float>&    bin_maxes  /* in */,
-                  int      bin_count    /* in */,
-                  float    min_meas     /* in */) {
-        int bottom = 0, top = bin_count - 1;
-        int mid;
-        float bin_max, bin_min;
+           for (int i = 0; i < data_count; i++)
+               data[i] = min_meas + (max_meas - min_meas)*rand() / ((double)RAND_MAX);
 
-        while (bottom <= top) {
-            mid = (bottom + top) / 2;
-            bin_max = bin_maxes[mid];
-            bin_min = (mid == 0) ? min_meas : bin_maxes[mid - 1];
-            if (data >= bin_max)
-                bottom = mid + 1;
-            else if (data < bin_min)
-                top = mid - 1;
-            else
-                return mid;
-        }
+   }  /* gen_data */
 
-        /* Whoops! */
-        cerr << "Data = "<< data << " doesn't belong to a bin!" << endl;
-        cerr << "Quitting" << endl;
-        exit(-1);
-    }  /* which_bin */
+   /*---------------------------------------------------------------------
+    * Function:  gen_bins
+    * Purpose:   Compute max value for each bin, and store 0 as the
+    *            number of values in each bin
+    * In args:   min_meas:   the minimum possible measurement
+    *            max_meas:   the maximum possible measurement
+    *            bin_count:  the number of bins
+    * Out args:  bin_maxes:  the maximum possible value for each bin
+    *            bin_counts: the number of data values in each bin
+    */
+   void gen_bins(
+                 float min_meas      /* in  */,
+                 float max_meas      /* in  */,
+                 vector<float>& bin_maxes   /* out */,
+                 vector<int>&   bin_counts  /* out */,
+                 int   bin_count     /* in  */) {
+       float bin_width;
 
-    /*---------------------------------------------------------------------
-     * Function:  print_histo
-     * Purpose:   Print a histogram.  The number of elements in each
-     *            bin is shown by an array of X's.
-     * In args:   bin_maxes:   the max value for each bin
-     *            bin_counts:  the number of elements in each bin
-     *            bin_count:   the number of bins
-     *            min_meas:    the minimum possible measurment
-     */
-    void print_histo(
- 	   vector<float>    bin_maxes   /* in */,
- 	   vector<int>     bin_counts   /* in */,
- 	   int      bin_count     /* in */,
- 	   float    min_meas      /* in */) {
- 	   float bin_max, bin_min;
+       bin_width = (max_meas - min_meas) / bin_count;
 
- 	   for (int i = 0; i < bin_count; i++) {
- 		   bin_max = bin_maxes[i];
- 		   bin_min = (i == 0) ? min_meas : bin_maxes[i - 1];
- 		   printf("%.3f-%.3f:\t", bin_min, bin_max);
- 		   for (int j = 0; j < bin_counts[i]; j++)
- 			   cout << "X";
- 		   cout << endl;
- 	   }
-    }
+       for (int i = 0; i < bin_count; i++) {
+           bin_maxes[i] = min_meas + (i + 1)*bin_width;
+           bin_counts[i] = 0;
+       }
+
+   #  ifdef DEBUG
+       cout << "bin_maxes = ";
+       for (int i = 0; i < bin_count; i++)
+           cout << " " << bin_maxes[i];
+       cout << endl;
+   #  endif
+   }  /* gen_bins */
+
+   /*---------------------------------------------------------------------
+    * Function:  which_bin
+    * Purpose:   Use binary search to determine which bin a measurement
+    *            belongs to
+    * In args:   data:       the current measurement
+    *            bin_maxes:  list of max bin values
+    *            bin_count:  number of bins
+    *            min_meas:   the minimum possible measurement
+    * Return:    the number of the bin to which data belongs
+    * Notes:
+    * 1.  The bin to which data belongs satisfies
+    *
+    *            bin_maxes[i-1] <= data < bin_maxes[i]
+    *
+    *     where, bin_maxes[-1] = min_meas
+    * 2.  If the search fails, the function prints a message and exits
+    */
+   int which_bin(
+                 float    data         /* in */,
+                 vector<float>&    bin_maxes  /* in */,
+                 int      bin_count    /* in */,
+                 float    min_meas     /* in */) {
+       int bottom = 0, top = bin_count - 1;
+       int mid;
+       float bin_max, bin_min;
+
+       while (bottom <= top) {
+           mid = (bottom + top) / 2;
+           bin_max = bin_maxes[mid];
+           bin_min = (mid == 0) ? min_meas : bin_maxes[mid - 1];
+           if (data >= bin_max)
+               bottom = mid + 1;
+           else if (data < bin_min)
+               top = mid - 1;
+           else
+               return mid;
+       }
+
+       /* Whoops! */
+       cerr << "Data = "<< data << " doesn't belong to a bin!" << endl;
+       cerr << "Quitting" << endl;
+       exit(-1);
+   }  /* which_bin */
+
+   /*---------------------------------------------------------------------
+    * Function:  print_histo
+    * Purpose:   Print a histogram.  The number of elements in each
+    *            bin is shown by an array of X's.
+    * In args:   bin_maxes:   the max value for each bin
+    *            bin_counts:  the number of elements in each bin
+    *            bin_count:   the number of bins
+    *            min_meas:    the minimum possible measurment
+    */
+   void print_histo(
+                    vector<float>    bin_maxes   /* in */,
+                    vector<int>     bin_counts   /* in */,
+                    int      bin_count     /* in */,
+                    float    min_meas      /* in */) {
+       float bin_max, bin_min;
+
+       for (int i = 0; i < bin_count; i++) {
+           bin_max = bin_maxes[i];
+           bin_min = (i == 0) ? min_meas : bin_maxes[i - 1];
+           printf("%.3f-%.3f:\t", bin_min, bin_max);
+           for (int j = 0; j < bin_counts[i]; j++)
+               cout << "X";
+           cout << endl;
+       }
+   }  /* print_histo */
+
+   void get_input(int my_rank, int comm_sz, int bin_count, int data_count, float min_meas, float max_meas) {
+	   if (my_rank == 0) {
+		   cin.get(); // por alguna extraña razón queda en el buffer un '\n' que se debe eliminar antes del ignore().
+		   for (int dest = 1; dest < comm_sz; dest++) {
+			   MPI_Send(&bin_count, 1, MPI_INT, dest, 0, MPI_COMM_WORLD);
+			   MPI_Send(&data_count, 1, MPI_INT, dest, 0, MPI_COMM_WORLD);
+			   MPI_Send(&min_meas, 1, MPI_FLOAT, dest, 0, MPI_COMM_WORLD);
+			   MPI_Send(&max_meas, 1, MPI_FLOAT, dest, 0, MPI_COMM_WORLD);
+		   }
+	   }
+	   else { /* my_rank != 0 */
+		   MPI_Recv(&bin_count, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		   MPI_Recv(&data_count, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		   MPI_Recv(&min_meas, 1, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		   MPI_Recv(&max_meas, 1, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	   }
+   }  /* Get_input */
+
+   /*---------------------------------------------------------------------
+   * REQ: N/A
+   * MOD: N/A
+   * EFE: despliega mensaje indicando cómo ejecutar el programa y pasarle parámetros de entrada.
+   * ENTRAN:
+   *		nombre_prog:  nombre del programa
+   * SALEN: N/A
+   */
+void uso(string nombre_prog /* in */) {
+	cerr << nombre_prog.c_str() << " secuencia de parámetros de entrada" << endl;
+	exit(0);
+}  /* uso */
+
+   /*---------------------------------------------------------------------
+   * REQ: N/A
+   * MOD: dato_salida
+   * EFE: obtiene los valores de los argumentos pasados por "línea de comandos".
+   * ENTRAN:
+   *		nombre_prog:  nombre del programa
+   * SALEN:
+   *		dato_salida: un dato de salida con un valor de argumento pasado por "línea de comandos".
+   */
+//
+//void obt_args(
+//	char*    argv[]        /* in  */,
+//	int&     dato_salida  /* out */) {
+//
+//	dato_salida = strtol(argv[1], NULL, 10); // se obtiene valor del argumento 1 pasado por "línea de comandos".
+//
+//#  ifdef DEBUG
+//	cout << "dato_salida = " << dato_salida << endl;
+//#  endif
+//}
+
+void obt_args(
+              char*    argv[]        /* in  */,
+              int&     bin_count_p   /* out */,
+              float&   min_meas_p    /* out */,
+              float&   max_meas_p    /* out */,
+              int&     data_count_p  /* out */) {
+
+    bin_count_p = strtol(argv[1], NULL, 10);
+    min_meas_p = strtof(argv[2], NULL);
+    max_meas_p = strtof(argv[3], NULL);
+    data_count_p = strtol(argv[4], NULL, 10);
+
+}  /* get_args */
