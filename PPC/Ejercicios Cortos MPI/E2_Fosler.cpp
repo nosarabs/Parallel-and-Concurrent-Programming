@@ -17,9 +17,7 @@
 #include <stdlib.h>
 #include <vector>
 #include <string>
-#include <chrono> // para medir el tiempo de ejecución
 #include <omp.h>
-
 using namespace std;
 
 //#define DEBUG
@@ -49,7 +47,8 @@ void print_histo(
                  vector<float>    bin_maxes   /* in */,
                  vector<int>     bin_counts   /* in */,
                  int      bin_count     /* in */,
-                 float    min_meas      /* in */);
+                 float    min_meas      /* in */,
+                 int * total);
 
 void get_input(int, int, int, int, float, float);
 
@@ -60,16 +59,9 @@ void obt_args(
               float&   max_meas_p    /* out */,
               int&     data_count_p  /* out */);
 
-//void obt_args(
-//	char*    argv[]        /* in  */,
-//	int&     dato_salida  /* out */);
 
 int main(int argc, char* argv[]) {
-	using namespace std::chrono;
 
-	int mid; // id de cada proceso
-	int cnt_proc; // cantidad de procesos
-	MPI_Status mpi_status; // para capturar estado al finalizar invocación de funciones MPI
 
 	int bin_count, bin;          // cantidad de bins, bin actual, bin == rango
 	float min_meas, max_meas;	// valor inferior de datos, valor superior de datos
@@ -78,6 +70,10 @@ int main(int argc, char* argv[]) {
 	vector<int> bin_counts;		// vector para contar valores por bin
 	vector<int> bin_countsTotal;
 	vector<float> data;          // vector de datos
+
+  int mid; // id de cada proceso
+	int cnt_proc; // cantidad de procesos
+	MPI_Status mpi_status; // para capturar estado al finalizar invocación de funciones MPI
 
 						   /* Arrancar ambiente MPI */
 	MPI_Init(&argc, &argv);             		/* Arranca ambiente MPI */
@@ -90,34 +86,40 @@ int main(int argc, char* argv[]) {
 	MPI_Barrier(MPI_COMM_WORLD);
 #  endif
 
+if (mid == 0) {
+		if (argc != 5) usage(argv[0]);
+	}
+
+  obt_args(argv, bin_count, min_meas, max_meas, data_count);
+  bin_maxes.resize(bin_count);
+	bin_counts.resize(bin_count);
+	data.resize(data_count);
+  int* local = new int[bin_count];
+	int* total = new int[bin_count];
+
+
 	/* ejecución del proceso principal */
 
 	    /* Check and get command line args */
 	if (!mid) {
 		if (argc != 5) uso(argv[0]);
-		obt_args(argv, bin_count, min_meas, max_meas, data_count);
 		data_count = data_count / cnt_proc;
 		bin_countsTotal.resize(bin_count);
 	}
 
 	/* Allocate arrays needed */
-	get_input(mid, cnt_proc, bin_count, data_count, min_meas, max_meas);
-	bin_maxes.resize(bin_count);
-	bin_counts.resize(bin_count);
-	data.resize(data_count);
-
 	gen_data(min_meas, max_meas, data, data_count);
 	gen_bins(min_meas, max_meas, bin_maxes, bin_counts, bin_count);
 
-	for (int i = 0; i < data_count; i++) {
+	for (int i = mid * (data_count / cnt_proc); i < mid * (data_count / cnt_proc) + (data_count / cnt_proc) - 1; ++i) {
 		bin = which_bin(data[i], bin_maxes, bin_count, min_meas);
 		bin_counts[bin]++;
+    local[bin] = bin_counts[bin];
 	}
-
-	MPI_Reduce(&bin_counts, &bin_countsTotal, data_count, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+	MPI_Reduce(local, total, bin_count, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
 	if (!mid) {
-		print_histo(bin_maxes, bin_countsTotal, bin_count, min_meas);
+		print_histo(bin_maxes, total, bin_count, min_meas);
 	}
 
 	/* finalización de la ejecución paralela */
@@ -253,32 +255,7 @@ int main(int argc, char* argv[]) {
        }
    }  /* print_histo */
 
-   void get_input(int my_rank, int comm_sz, int bin_count, int data_count, float min_meas, float max_meas) {
-	   if (my_rank == 0) {
-		   cin.get(); // por alguna extraña razón queda en el buffer un '\n' que se debe eliminar antes del ignore().
-		   for (int dest = 1; dest < comm_sz; dest++) {
-			   MPI_Send(&bin_count, 1, MPI_INT, dest, 0, MPI_COMM_WORLD);
-			   MPI_Send(&data_count, 1, MPI_INT, dest, 0, MPI_COMM_WORLD);
-			   MPI_Send(&min_meas, 1, MPI_FLOAT, dest, 0, MPI_COMM_WORLD);
-			   MPI_Send(&max_meas, 1, MPI_FLOAT, dest, 0, MPI_COMM_WORLD);
-		   }
-	   }
-	   else { /* my_rank != 0 */
-		   MPI_Recv(&bin_count, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		   MPI_Recv(&data_count, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		   MPI_Recv(&min_meas, 1, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		   MPI_Recv(&max_meas, 1, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-	   }
-   }  /* Get_input */
 
-   /*---------------------------------------------------------------------
-   * REQ: N/A
-   * MOD: N/A
-   * EFE: despliega mensaje indicando cómo ejecutar el programa y pasarle parámetros de entrada.
-   * ENTRAN:
-   *		nombre_prog:  nombre del programa
-   * SALEN: N/A
-   */
 void uso(string nombre_prog /* in */) {
 	cerr << nombre_prog.c_str() << " secuencia de parámetros de entrada" << endl;
 	exit(0);
@@ -293,17 +270,6 @@ void uso(string nombre_prog /* in */) {
    * SALEN:
    *		dato_salida: un dato de salida con un valor de argumento pasado por "línea de comandos".
    */
-//
-//void obt_args(
-//	char*    argv[]        /* in  */,
-//	int&     dato_salida  /* out */) {
-//
-//	dato_salida = strtol(argv[1], NULL, 10); // se obtiene valor del argumento 1 pasado por "línea de comandos".
-//
-//#  ifdef DEBUG
-//	cout << "dato_salida = " << dato_salida << endl;
-//#  endif
-//}
 
 void obt_args(
               char*    argv[]        /* in  */,
