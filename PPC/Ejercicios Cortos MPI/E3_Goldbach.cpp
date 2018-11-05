@@ -29,6 +29,15 @@ int main(int argc, char* argv[]) {
 	int cnt_proc; // cantidad de procesos
 	MPI_Status mpi_status; // para capturar estado al finalizar invocación de funciones MPI
 
+	int n;
+	int cnt_proc;
+
+	cout << "N: " << endl;
+	cin >> n;
+
+	cout << "Cantidad de Procesos: " << endl;
+	cin >> cnt_proc;
+
 	/* Arrancar ambiente MPI */
 	MPI_Init(&argc, &argv);             		/* Arranca ambiente MPI */
 	MPI_Comm_rank(MPI_COMM_WORLD, &mid); 		/* El comunicador le da valor a id (rank del proceso) */
@@ -41,6 +50,24 @@ int main(int argc, char* argv[]) {
 #  endif
 
 	/* ejecución del proceso principal */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 	/* finalización de la ejecución paralela */
 	if (mid == 0)
