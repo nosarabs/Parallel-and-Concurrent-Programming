@@ -1,27 +1,15 @@
 /* Archivo:      mpi_plantilla.cpp
-
 * Propósito:   ....
-
 *
-
 * Compilación:   mpicxx -g -Wall -o mpi_plantilla mpi_plantilla.cpp
-
 * Ejecución:     mpiexec -n <num_proc> ./mpi_plantilla <secuencia de valores de parámetros>
-
 *
-
 * Entradas:     ...
-
 * Salidas:    ...
-
 *
-
 * Notas:
-
 * 1.  bandera DEBUG produce salida detallada para depuración.
-
 *
-
 */
 
 
@@ -108,8 +96,10 @@ int main(int argc, char* argv[]) {
 	int x = 1;
 	vec.resize(n);
 
+	int nxProc = (n - 5) / cnt_proc;
+
 	vec[0] = 2;
-	int* local = new int[((n - 5) / cnt_proc) * 3];
+	int* local = new int[nxProc*3];
 
 	for (int i = 3; i <= n; i += 2) {
 		primo = true;
@@ -129,11 +119,7 @@ int main(int argc, char* argv[]) {
 	int cont = 0;
 	int j = 0;
 
-	cout << mid << endl;
-	cout << 6 + ((n - 5) / cnt_proc)*mid << endl;
-	cout << 6 + ((n - 5) / cnt_proc)*(mid+1) << endl;
-
-	for (int i = 6+((n-5)/cnt_proc)*mid; i <= 6+((n - 5) / cnt_proc)*(mid+1); ++i) {
+	for (int i = 6+mid*nxProc; i <= 5+mid*nxProc + nxProc; ++i) {
 		suma = 0;
 		j = x - 1;
 		if (i % 2 == 0) {
@@ -177,9 +163,9 @@ int main(int argc, char* argv[]) {
 
 	int g = 0;
 
-	for (int y = 0; y <= ((n-5)/cnt_proc); ++y) {
+	for (int y = 0; y < nxProc; ++y) {
 
-		cout << "Numeros Primos para: " << y << ": ";
+		cout << "Numeros Primos para: " << 6+nxProc*mid+y << ": ";
 
 		cout << local[g] << "," << local[g + 1] << "," << local[g + 2] << endl;
 
@@ -238,19 +224,12 @@ int main(int argc, char* argv[]) {
 
 
    /*---------------------------------------------------------------------
-
    * REQ: N/A
-
    * MOD: N/A
-
    * EFE: despliega mensaje indicando cómo ejecutar el programa y pasarle parámetros de entrada.
-
    * ENTRAN:
-
    *		nombre_prog:  nombre del programa
-
    * SALEN: N/A
-
    */
 
 void uso(string nombre_prog /* in */) {
@@ -264,21 +243,13 @@ void uso(string nombre_prog /* in */) {
 
 
    /*---------------------------------------------------------------------
-
    * REQ: N/A
-
    * MOD: dato_salida
-
    * EFE: obtiene los valores de los argumentos pasados por "línea de comandos".
-
    * ENTRAN:
-
    *		nombre_prog:  nombre del programa
-
    * SALEN:
-
    *		dato_salida: un dato de salida con un valor de argumento pasado por "línea de comandos".
-
    */
 
 void obt_args(
