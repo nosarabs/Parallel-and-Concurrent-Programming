@@ -1,12 +1,36 @@
+/* Archivo:      mpi_plantilla.cpp
+
+* Propósito:   ....
+
+*
+
+* Compilación:   mpicxx -g -Wall -o mpi_plantilla mpi_plantilla.cpp
+
+* Ejecución:     mpiexec -n <num_proc> ./mpi_plantilla <secuencia de valores de parámetros>
+
+*
+
+* Entradas:     ...
+
+* Salidas:    ...
+
+*
+
+* Notas:
+
+* 1.  bandera DEBUG produce salida detallada para depuración.
+
+*
+
+*/
+
+
+
 #include <mpi.h>
 
 #include <iostream>
 
-#include<random>
-
-#include<math.h>
-
-
+#include <vector>
 
 using namespace std;
 
@@ -24,23 +48,11 @@ void obt_args(
 
 	char*    argv[]        /* in  */,
 
-	int&     quan         /*  in  */);
+	int&     dato_salida  /* out */);
 
 
 
 int main(int argc, char* argv[]) {
-
-	random_device generator;
-
-	uniform_real_distribution<double> distribution(-1.0, 1.0);
-
-	double x, y, distancia, estimado, t1, t2;
-
-	double local_start, local_finish, local_elapsed, elapsed;
-
-	int aciertos = 0;
-
-	int quan, block, local_int, total_int;
 
 	int mid; // id de cada proceso
 
@@ -48,9 +60,15 @@ int main(int argc, char* argv[]) {
 
 	MPI_Status mpi_status; // para capturar estado al finalizar invocación de funciones MPI
 
+	vector<int> vec; // Vector de numeros
+
+	int n;
 
 
-						   /* Arrancar ambiente MPI */
+
+
+
+	/* Arrancar ambiente MPI */
 
 	MPI_Init(&argc, &argv);             		/* Arranca ambiente MPI */
 
@@ -74,57 +92,132 @@ int main(int argc, char* argv[]) {
 
 	/* ejecución del proceso principal */
 
-	if (mid == 0) {
+	if (!mid) {
 
-		uso("Aproximacion de Pi");
-
-	}
-
-	MPI_Barrier(MPI_COMM_WORLD);
-
-	local_start = MPI_Wtime();
-
-	obt_args(argv, quan);
-
-	block = quan / cnt_proc;
-
-	for (int i = mid*block; i < (mid*block)+block-1; i++) {
-
-		x = distribution(generator);
-
-		y = distribution(generator);
-
-		distancia = x * x + y * y;
-
-		if (distancia <= 1) {
-
-			aciertos++;
-
-			local_int = aciertos;
-
+		cout << "N: " << endl;
+		cin >> n;
+		for (int c = 1; c < cnt_proc; c++) {
+			MPI_Send(&n, 1, MPI_INT, c, 0, MPI_COMM_WORLD);
 		}
+	}
+	else {
+		MPI_Recv(&n, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	}
+
+	bool primo = true;
+	int x = 1;
+	vec.resize(n);
+
+	vec[0] = 2;
+	int* local = new int[((n - 5) / cnt_proc) * 3];
+
+	for (int i = 3; i <= n; i += 2) {
+		primo = true;
+		for (int j = 3; j <= sqrt(i); j += 2) {
+			if (i % j == 0) {
+				primo = false;
+			}
+		}
+		if (primo) {
+			vec[x] = i;
+			++x;
+		}
+	}
+
+	int suma = 0;
+	int indice = 0;
+	int cont = 0;
+	int j = 0;
+
+	cout << mid << endl;
+	cout << 6 + ((n - 5) / cnt_proc)*mid << endl;
+	cout << 6 + ((n - 5) / cnt_proc)*(mid+1) << endl;
+
+	for (int i = 6+((n-5)/cnt_proc)*mid; i <= 6+((n - 5) / cnt_proc)*(mid+1); ++i) {
+		suma = 0;
+		j = x - 1;
+		if (i % 2 == 0) {
+			local[indice] = 0;
+			++indice;
+			cont = 2;
+		}
+		else {
+			cont = 3;
+		}
+		while (cont > 0 && j >= 0) {
+			if (vec[j]<i - 1) {
+				if (suma + vec[j] <= i) {
+					if (i - (suma + vec[j]) != 1) {
+						local[indice] = vec[j];
+						++indice;
+						suma += vec[j];
+						--cont;
+					}
+					else {
+						--j;
+					}
+				}
+				else {
+					--j;
+				}
+			}
+			else {
+				--j;
+			}
+		}
+		if (cont >= 1) {
+			local[indice] = 0;
+			++indice;
+		}
+	}
+
+
+
+
+
+	int g = 0;
+
+	for (int y = 0; y <= ((n-5)/cnt_proc); ++y) {
+
+		cout << "Numeros Primos para: " << y << ": ";
+
+		cout << local[g] << "," << local[g + 1] << "," << local[g + 2] << endl;
+
+		g += 3;
 
 	}
 
-	MPI_Reduce(&local_int, &total_int, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
-	local_finish = MPI_Wtime();
 
-	local_elapsed = local_finish - local_start;
+	//int* total = new int[((n - 5) * 3)];
 
-	MPI_Reduce(&local_elapsed, &elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, comm);
+	//MPI_Gather(local, ((n - 5) * 3)/cnt_proc, MPI_INT, total, ((n - 5) * 3), MPI_INT, 0, MPI_COMM_WORLD);
 
-	if(mid == 0){
 
-		estimado = 4 * (double)total_int / (double)quan;
 
-		cout << "Tiempo transcurrido = " << elapsed << endl;
+	//if (mid == 0) {
 
-		cout << estimado << " Estimado con MonteCarlo" << endl;
+	//	int g = 0;
 
-		cout << 4.0*atan(1.0) << " Estimado con formula" << endl;
+	//	for (int y = 6; y <= n; ++y) {
 
-	}
+	//		cout << "Numeros Primos para: " << y << ": ";
+
+	//		cout << total[g] << "," << total[g + 1] << "," << total[g + 2] << endl;
+
+	//		g += 3;
+
+	//	}
+
+	//}
+
+
+
+
+
+	cin >> n;
+
+
 
 	/* finalización de la ejecución paralela */
 
@@ -164,9 +257,7 @@ void uso(string nombre_prog /* in */) {
 
 	cerr << nombre_prog.c_str() << " secuencia de parámetros de entrada" << endl;
 
-	cout << "Los parametros de entrada son la cantidad de procesos y de numeros a sumar" << endl;
-
-	cout << "La salida son los estimados de MonteCarlo y por formula. Además, se despliega el tiempo que tardó el programa" << endl;
+	exit(0);
 
 }  /* uso */
 
@@ -194,19 +285,17 @@ void obt_args(
 
 	char*    argv[]        /* in  */,
 
-	int&     quan         /*  in  */) {
+	int&     dato_salida  /* out */) {
 
 
 
-	quan = strtol(argv[1], NULL, 10); // se obtiene valor del argumento 2 pasado por "línea de comandos".
+	dato_salida = strtol(argv[1], NULL, 10); // se obtiene valor del argumento 1 pasado por "línea de comandos".
 
 
 
 #  ifdef DEBUG
 
-	cout << "dato_salida = " << quan << endl;
-
-
+	cout << "dato_salida = " << dato_salida << endl;
 
 #  endif
 
