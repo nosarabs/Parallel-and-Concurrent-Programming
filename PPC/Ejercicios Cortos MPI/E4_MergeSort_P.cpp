@@ -14,11 +14,25 @@
 
 #include <mpi.h>
 #include <iostream>
+#include <omp.h>
+#include <math.h>
+#include <stdlib.h>
+#include <time.h>
+#include <chrono> // para medir el tiempo de ejecución
+#include <vector>
+#include <algorithm>
 using namespace std;
 
 //#define DEBUG
 
 void uso(string nombre_prog);
+void genNums(int* vec, int n, int mid);
+void print(int* vec, int mid);
+void mergeSort(int* vec, int mid, int cantxProc);
+void mergeParalelo(int* vec, int mid);
+
+int tam = 10;
+int cantxProc;
 
 void obt_args(
 	char*    argv[]        /* in  */,
@@ -29,7 +43,7 @@ int main(int argc, char* argv[]) {
 	int cnt_proc; // cantidad de procesos
 	MPI_Status mpi_status; // para capturar estado al finalizar invocación de funciones MPI
 
-	/* Arrancar ambiente MPI */
+						   /* Arrancar ambiente MPI */
 	MPI_Init(&argc, &argv);             		/* Arranca ambiente MPI */
 	MPI_Comm_rank(MPI_COMM_WORLD, &mid); 		/* El comunicador le da valor a id (rank del proceso) */
 	MPI_Comm_size(MPI_COMM_WORLD, &cnt_proc);  /* El comunicador le da valor a p (número de procesos) */
@@ -41,6 +55,31 @@ int main(int argc, char* argv[]) {
 #  endif
 
 	/* ejecución del proceso principal */
+	cantxProc = tam / cnt_proc;
+	int* local = new int[tam];
+	int* total = new int[tam];
+
+	for (int i = 0; i < tam; i++) {
+		local[i] = 0;
+		total[i] = 0;
+	}
+
+	genNums(local, cantxProc, mid);
+	mergeSort(local, mid, cantxProc);
+
+	MPI_Barrier(MPI_COMM_WORLD); // para sincronizar la finalización de los procesos
+	MPI_Reduce(local, total, tam, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+	if (mid == 0) {
+
+		for (int i = 0; i < cnt_proc - 1; ++i) {
+			inplace_merge(total, total+(cantxProc * (i + 2)) - cantxProc, total + (cantxProc * (i + 2)));
+		}
+		print(total, mid);
+	}
+
+	int n;
+	cin >> n;
 
 	/* finalización de la ejecución paralela */
 	if (mid == 0)
@@ -51,14 +90,47 @@ int main(int argc, char* argv[]) {
 	return 0;
 }  /* main */
 
-   /*---------------------------------------------------------------------
-   * REQ: N/A
-   * MOD: N/A
-   * EFE: despliega mensaje indicando cómo ejecutar el programa y pasarle parámetros de entrada.
-   * ENTRAN:
-   *		nombre_prog:  nombre del programa
-   * SALEN: N/A
-   */
+
+void genNums(int* vec, int n, int mid) {
+	int min = n * mid;
+	int max = min + n;
+	for (int i = min; i < max; ++i) {
+		vec[i] = rand() % 11;
+	}
+}
+
+void mergeSort(int* vec, int mid, int cantxProc) {
+	sort(vec + mid*cantxProc, vec + (mid*cantxProc) + cantxProc);
+}
+
+void print(int* vec, int mid) {
+	cout << " Imprimiendo vec de: " << mid << endl;
+	for (int i = 0; i < tam; i++) {
+		cout << vec[i] << ",";
+	}
+}
+
+void mergeParalelo(int* vec, int mid) {
+
+	//if (mid == 0) {
+	//	//MPI_Recv(&tiros, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	//}
+	//else {
+
+	//}
+	////MPI_Send(&tiros, 1, MPI_DOUBLE, dest, 0, MPI_COMM_WORLD);
+	////MPI_Recv(&tiros, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+}
+
+
+/*---------------------------------------------------------------------
+* REQ: N/A
+* MOD: N/A
+* EFE: despliega mensaje indicando cómo ejecutar el programa y pasarle parámetros de entrada.
+* ENTRAN:
+*		nombre_prog:  nombre del programa
+* SALEN: N/A
+*/
 void uso(string nombre_prog /* in */) {
 	cerr << nombre_prog.c_str() << " secuencia de parámetros de entrada" << endl;
 	exit(0);
