@@ -15,9 +15,9 @@
 
 
 #include <mpi.h>
-
 #include <iostream>
-
+#include <math.h>
+#include <time.h>
 #include <vector>
 
 using namespace std;
@@ -42,6 +42,8 @@ void obt_args(
 
 int main(int argc, char* argv[]) {
 
+	double local_start, local_finish, local_elapsed, elapsed;
+
 	int mid; // id de cada proceso
 
 	int cnt_proc; // cantidad de procesos
@@ -51,9 +53,6 @@ int main(int argc, char* argv[]) {
 	vector<int> vec; // Vector de numeros
 
 	int n;
-
-
-
 
 
 	/* Arrancar ambiente MPI */
@@ -92,6 +91,8 @@ int main(int argc, char* argv[]) {
 		MPI_Recv(&n, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	}
 
+	local_start = MPI_Wtime();
+
 	bool primo = true;
 	int x = 1;
 	vec.resize(n);
@@ -99,7 +100,7 @@ int main(int argc, char* argv[]) {
 	int nxProc = (n - 5) / cnt_proc;
 
 	vec[0] = 2;
-	int* local = new int[nxProc*3];
+	int* local = new int[nxProc * 3];
 
 	for (int i = 3; i <= n; i += 2) {
 		primo = true;
@@ -119,7 +120,7 @@ int main(int argc, char* argv[]) {
 	int cont = 0;
 	int j = 0;
 
-	for (int i = 6+mid*nxProc; i <= 5+mid*nxProc + nxProc; ++i) {
+	for (int i = 6 + mid * nxProc; i <= 5 + mid * nxProc + nxProc; ++i) {
 		suma = 0;
 		j = x - 1;
 		if (i % 2 == 0) {
@@ -158,52 +159,48 @@ int main(int argc, char* argv[]) {
 	}
 
 
+	//int g = 0;
 
+	//for (int y = 0; y < nxProc; ++y) {
 
+	//	cout << "Numeros Primos para: " << 6 + nxProc * mid + y << ": ";
 
-	int g = 0;
+	//	cout << local[g] << "," << local[g + 1] << "," << local[g + 2] << endl;
 
-	for (int y = 0; y < nxProc; ++y) {
-
-		cout << "Numeros Primos para: " << 6+nxProc*mid+y << ": ";
-
-		cout << local[g] << "," << local[g + 1] << "," << local[g + 2] << endl;
-
-		g += 3;
-
-	}
-
-
-
-	//int* total = new int[((n - 5) * 3)];
-
-	//MPI_Gather(local, ((n - 5) * 3)/cnt_proc, MPI_INT, total, ((n - 5) * 3), MPI_INT, 0, MPI_COMM_WORLD);
-
-
-
-	//if (mid == 0) {
-
-	//	int g = 0;
-
-	//	for (int y = 6; y <= n; ++y) {
-
-	//		cout << "Numeros Primos para: " << y << ": ";
-
-	//		cout << total[g] << "," << total[g + 1] << "," << total[g + 2] << endl;
-
-	//		g += 3;
-
-	//	}
+	//	g += 3;
 
 	//}
 
+	local_finish = MPI_Wtime();
+	local_elapsed = local_finish - local_start;
+	MPI_Reduce(&local_elapsed, &elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+	int* total = new int[((n - 5) * 3)];
+
+	MPI_Gather(local, ((n - 5) * 3)/cnt_proc, MPI_INT, total, ((n - 5) * 3)/cnt_proc, MPI_INT, 0, MPI_COMM_WORLD);
 
 
 
+	if (mid == 0) {
+
+		int g = 0;
+
+		for (int y = 6; y < n; ++y) {
+
+			cout << "Numeros Primos para: " << y << ": ";
+
+			cout << total[g] << "," << total[g + 1] << "," << total[g + 2] << endl;
+
+			g += 3;
+
+		}
+
+	}
+
+	if (mid == 0)
+		cout << "Tiempo transcurrido = " << elapsed << endl;
 
 	cin >> n;
-
-
 
 	/* finalización de la ejecución paralela */
 
