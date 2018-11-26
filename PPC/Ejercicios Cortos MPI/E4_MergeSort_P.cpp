@@ -29,9 +29,9 @@ void uso(string nombre_prog);
 void genNums(int* vec, int n, int mid);
 void print(int* vec, int mid);
 void mergeSort(int* vec, int mid, int cantxProc);
-void mergeParalelo(int* vec, int mid);
+void mergeParalelo(int* local, int mid, int cnt_procesos, int cantxProc);
 
-int tam = 10;
+int tam = 20;
 int cantxProc;
 
 void obt_args(
@@ -68,16 +68,11 @@ int main(int argc, char* argv[]) {
 	mergeSort(local, mid, cantxProc);
 
 	MPI_Barrier(MPI_COMM_WORLD); // para sincronizar la finalización de los procesos
-	MPI_Reduce(local, total, tam, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
+	mergeParalelo(local, mid, cnt_proc, cantxProc);
 	if (mid == 0) {
-
-		for (int i = 0; i < cnt_proc - 1; ++i) {
-			inplace_merge(total, total+(cantxProc * (i + 2)) - cantxProc, total + (cantxProc * (i + 2)));
-		}
-		print(total, mid);
+		print(local, mid);
 	}
-
 	int n;
 	cin >> n;
 
@@ -100,7 +95,7 @@ void genNums(int* vec, int n, int mid) {
 }
 
 void mergeSort(int* vec, int mid, int cantxProc) {
-	sort(vec + mid*cantxProc, vec + (mid*cantxProc) + cantxProc);
+	sort(vec + mid * cantxProc, vec + (mid*cantxProc) + cantxProc);
 }
 
 void print(int* vec, int mid) {
@@ -110,16 +105,72 @@ void print(int* vec, int mid) {
 	}
 }
 
-void mergeParalelo(int* vec, int mid) {
+void mergeParalelo(int* local, int mid, int cnt_procesos, int cantxProc) {
+	cout << "cnt: " << cnt_procesos << endl;
+	int* temporal = new int[tam];
+	int j = 0;
+	int mitad = 0;
+	int pot = 0;
+	int pot2 = 0;
+	bool enviado = false;
+	int i = 1;
+	while (i <= log2(cnt_procesos) && enviado == false) {
+		j = cantxProc * (mid + 1);
+		pot = pow(2, i);
+		pot2 = pow(2, i - 1);
+		if (mid%pot == 0) {
+			//Recibe
+			cout << endl;
+			cout << "Recv: " << mid << " de: " << mid + pot2 << " Pot y Pot2 " << pot << " | " << pot2  << endl;
+			MPI_Recv(temporal, tam, MPI_INT, mid + pot2, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			mitad = j;
 
-	//if (mid == 0) {
-	//	//MPI_Recv(&tiros, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-	//}
-	//else {
+			for (j; j < tam; ++j) {
+				local[j] = temporal[j];
+			}
 
+			for (int h = 0; h < tam; ++h) {
+				cout << "Mid: " << mid << " " << local[h] << endl;
+			}
+			if (mid == 0 && i == 2) {
+				cout << "Inicio " << cantxProc * mid << " Mitad " << mitad << " Final " << local+j << endl;
+			}
+			inplace_merge(local + cantxProc * mid, local + mitad, local + j);
+		}
+		else if (mid > 0) {
+			//manda
+			cout << "Send: " << mid << " a: " << mid - pot2 << " Pot y Pot2 " << pot << " | " << pot2 << endl;
+			MPI_Send(local, tam, MPI_INT, mid - pot2, 0, MPI_COMM_WORLD);
+			enviado = true;
+		}
+		i++;
+	}
+	//for (int i = 1; i <= log2(cnt_procesos); ++i) {
+	//	pot = pow(2, i);
+	//	pot2 = pow(2, i - 1);
+	//	if (mid%pot == 0) {
+	//		//Recibe
+	//		cout << "Recv: " << mid << " de: " << mid+pot2 << endl;
+	//		MPI_Recv(temporal, tam, MPI_INT, mid + pot2, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	//		mitad = j;
+
+	//		for (j; j < tam; ++j) {
+	//			local[j] = temporal[j];
+	//		}
+
+	//		for (int h = 0; h < tam; ++h) {
+	//			cout << "Mid: " << mid << " " << local[h] << endl;
+	//		}
+
+	//		inplace_merge(local + cantxProc * mid, local + mitad, local + j);
+	//	}
+	//	else if (mid > 0) {
+	//		//manda
+	//		cout << "Send: " << mid << " a: " << mid-pot2 << endl;
+	//		MPI_Send(local, tam, MPI_INT, mid - pot2, 0, MPI_COMM_WORLD);
+	//		break;
+	//	}
 	//}
-	////MPI_Send(&tiros, 1, MPI_DOUBLE, dest, 0, MPI_COMM_WORLD);
-	////MPI_Recv(&tiros, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 }
 
 
