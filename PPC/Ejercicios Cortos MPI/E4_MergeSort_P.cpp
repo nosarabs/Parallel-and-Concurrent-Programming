@@ -27,18 +27,19 @@ using namespace std;
 
 void uso(string nombre_prog);
 void genNums(int* vec, int n, int mid);
-void print(int* vec, int mid);
+void print(int* vec, int mid, int tam);
 void mergeSort(int* vec, int mid, int cantxProc);
-void mergeParalelo(int* local, int mid, int cnt_procesos, int cantxProc);
+void mergeParalelo(int* local, int mid, int cnt_procesos, int cantxProc, int tam);
 
-int tam = 20;
 int cantxProc;
 
 void obt_args(
 	char*    argv[]        /* in  */,
-	int&     dato_salida  /* out */);
+	int&     tam  /* out */);
 
 int main(int argc, char* argv[]) {
+	double local_start, local_finish, local_elapsed, elapsed;
+	int tam;
 	int mid; // id de cada proceso
 	int cnt_proc; // cantidad de procesos
 	MPI_Status mpi_status; // para capturar estado al finalizar invocación de funciones MPI
@@ -54,7 +55,12 @@ int main(int argc, char* argv[]) {
 	MPI_Barrier(MPI_COMM_WORLD);
 #  endif
 
+	obt_args(argv, tam);
+
 	/* ejecución del proceso principal */
+
+	local_start = MPI_Wtime();
+
 	cantxProc = tam / cnt_proc;
 	int* local = new int[tam];
 	int* total = new int[tam];
@@ -69,9 +75,15 @@ int main(int argc, char* argv[]) {
 
 	MPI_Barrier(MPI_COMM_WORLD); // para sincronizar la finalización de los procesos
 
-	mergeParalelo(local, mid, cnt_proc, cantxProc);
+	mergeParalelo(local, mid, cnt_proc, cantxProc, tam);
+
+	local_finish = MPI_Wtime();
+	local_elapsed = local_finish - local_start;
+	MPI_Reduce(&local_elapsed, &elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
 	if (mid == 0) {
-		print(local, mid);
+		print(local, mid, tam);
+		cout << "Tiempo transcurrido = " << elapsed << endl;
 	}
 	int n;
 	cin >> n;
@@ -98,15 +110,15 @@ void mergeSort(int* vec, int mid, int cantxProc) {
 	sort(vec + mid * cantxProc, vec + (mid*cantxProc) + cantxProc);
 }
 
-void print(int* vec, int mid) {
+void print(int* vec, int mid, int tam) {
 	cout << " Imprimiendo vec de: " << mid << endl;
 	for (int i = 0; i < tam; i++) {
 		cout << vec[i] << ",";
 	}
 }
 
-void mergeParalelo(int* local, int mid, int cnt_procesos, int cantxProc) {
-	cout << "cnt: " << cnt_procesos << endl;
+void mergeParalelo(int* local, int mid, int cnt_procesos, int cantxProc, int tam) {
+	//cout << "cnt: " << cnt_procesos << endl;
 	int* temporal = new int[tam];
 	int j = 0;
 	int mitad = 0;
@@ -120,8 +132,8 @@ void mergeParalelo(int* local, int mid, int cnt_procesos, int cantxProc) {
 		pot2 = pow(2, i - 1);
 		if (mid%pot == 0) {
 			//Recibe
-			cout << endl;
-			cout << "Recv: " << mid << " de: " << mid + pot2 << " Pot y Pot2 " << pot << " | " << pot2  << endl;
+			//cout << endl;
+			//cout << "Recv: " << mid << " de: " << mid + pot2 << " Pot y Pot2 " << pot << " | " << pot2 << endl;
 			MPI_Recv(temporal, tam, MPI_INT, mid + pot2, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			mitad = j;
 
@@ -130,16 +142,16 @@ void mergeParalelo(int* local, int mid, int cnt_procesos, int cantxProc) {
 			}
 
 			for (int h = 0; h < tam; ++h) {
-				cout << "Mid: " << mid << " " << local[h] << endl;
+				//cout << "Mid: " << mid << " " << local[h] << endl;
 			}
 			if (mid == 0 && i == 2) {
-				cout << "Inicio " << cantxProc * mid << " Mitad " << mitad << " Final " << local+j << endl;
+				//cout << "Inicio " << cantxProc * mid << " Mitad " << mitad << " Final " << local + j << endl;
 			}
 			inplace_merge(local + cantxProc * mid, local + mitad, local + j);
 		}
 		else if (mid > 0) {
 			//manda
-			cout << "Send: " << mid << " a: " << mid - pot2 << " Pot y Pot2 " << pot << " | " << pot2 << endl;
+			//cout << "Send: " << mid << " a: " << mid - pot2 << " Pot y Pot2 " << pot << " | " << pot2 << endl;
 			MPI_Send(local, tam, MPI_INT, mid - pot2, 0, MPI_COMM_WORLD);
 			enviado = true;
 		}
@@ -198,9 +210,9 @@ void uso(string nombre_prog /* in */) {
    */
 void obt_args(
 	char*    argv[]        /* in  */,
-	int&     dato_salida  /* out */) {
+	int&     tam /* out */) {
 
-	dato_salida = strtol(argv[1], NULL, 10); // se obtiene valor del argumento 1 pasado por "línea de comandos".
+	tam = strtol(argv[1], NULL, 10); // se obtiene valor del argumento 1 pasado por "línea de comandos".
 
 #  ifdef DEBUG
 	cout << "dato_salida = " << dato_salida << endl;
