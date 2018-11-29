@@ -1,289 +1,251 @@
-ï»¿// Antonio Ercolani Rojas B62456
-   // ProgramaciÃ³n Paralela y Concurrente - Conway's Game of Life
-#include "Simulador.h"
-#include "Persona.h"
-
+#include <mpi.h>
+#include <random>
+#include <iostream>
+#include <string>
+#include <time.h>
 using namespace std;
-using namespace std::chrono;
 
-Simulador::Simulador() {
-	this->init();
-	omp_init_lock(&lck);
+enum Estado { SUSCEPTIBLE = 1, INFECTADA, RECUPERADA, MUERTA };
+
+//Variables
+int cantidadP = 0;
+int potenciaVirus = 0;
+int probaRecu = 0;
+int ticsMuerte = 0;
+int cantInfectada = 0;
+int tam = 0;
+string output;
+
+int nInfectadas;
+int nSusceptibles;
+int nMuertas;
+int nRecuperadas;
+
+int * infectados;
+int * personas;
+int * cambios;
+
+//Funciones
+void init();
+void iniciaEspacio();
+void print();
+void actualizarMatriz();
+void acualizarEstado();
+
+void obt_args(
+	char*    argv[]        /* in  */,
+	int&     cantidadP     /* out */,
+	int&     potenciaVirus,
+	int&     probaRecu,
+	int&     ticsMuerte,
+	int&     cantInfectada,
+	int&     tam);
+
+int main(int argc, char* argv[]) {
+
+	srand(time(NULL));
+
+	obt_args(argv, cantidadP, potenciaVirus, probaRecu, ticsMuerte, cantInfectada, tam);
+
+	init();
+	iniciaEspacio();
+	print();
+	actualizarMatriz();
+
+	return 0;
 }
 
-Simulador::~Simulador() {
+void print() {
+	cout << "Infectadas: " << nInfectadas << endl;
+	cout << "Susceptibles: " << nSusceptibles << endl;
+	cout << "Muertas: " << nMuertas << endl;
+	cout << "Recuperadas: " << nRecuperadas << endl << endl;
 
+	for (int i = 0; i < cantidadP * 3; i += 3) {
+		std::cout << " P: ";
+		cout << personas[i] << " | ";
+		cout << personas[i + 1] << " | ";
+		cout << personas[i + 2] << endl;
+	}
+
+	cout << endl;
 }
 
-// Pregunta los datos de Entrada
-void Simulador::init() {
+void init() {
 
-	int h;
-	cout << "Cantidad de Hilos (0 para maxima cantidad posible): " << endl;
-	cin >> h;
-	setHilos(h);
-	output += "\nHilos Usados: " + to_string(hilos);
 
-	cout << "Cantidad de Personas: ";
-	cin >> cantidadP;
 	output += "\nCantidad de personas: " + to_string(cantidadP);
 
-	cout << "Potencia Infecciosa de Virus [0-100]: ";
-	cin >> potenciaVirus;
+
 	output += "\nPotencia del Virus: " + to_string(potenciaVirus) + "%";
 
-	cout << "Probabilidad de Recuperacion [0-100]: ";
-	cin >> probaRecu;
+
 	output += "\nProbabilidad Recuperacion: " + to_string(probaRecu) + "%";
 
-	cout << "Tics para Muerte o Recuperacion: ";
-	cin >> ticsMuerte;
+
 	output += "\nTics Para Muerte: " + to_string(ticsMuerte);
 
 
-	cout << "Porcentaje de Personas Originalmente Infectadas [0 - 100]: ";
-	cin >> cantInfectada;
-	output += "\nPorcentaje de personas infectadas inicial: " + to_string(cantInfectada) + "%";
-	cantInfectada = (cantidadP / cantInfectada);
+	output += "\nPorcentaje de Personas Originalmente Infectadas: " + to_string(cantInfectada) + "%";
 
-	cout << "Tamano del Espacio Bidimensional: " << endl;
+	output += "\nEspacio: " + to_string(tam) + "x" + to_string(tam);
 
-	cout << "1) 100x100 \n2) 500x500 \n3) 1000x1000 \n4) 35x35" << endl;
-	cin >> tamano;
+	cantInfectada = cantidadP * cantInfectada / 100;
+	nInfectadas = cantInfectada;
+	nSusceptibles = cantidadP - cantInfectada;
 
-	if (tamano == 1) {
-		tamano = 100;
-		output += "\nEspacio: 100x100";
-	}
-	else if (tamano == 2) {
-		tamano = 500;
-		output += "\nEspacio: 500x500";
-	}
-	else if (tamano == 3) {
-		tamano = 1000;
-		output += "\nEspacio: 1000x1000";
-	}
-	else {
-		tamano = 35;
-		output += "\nEspacio: 35x35";
-	}
 }
 
-void Simulador::iniciarMatriz() {
-	int randomInt1;
-	int randomInt2;
+void iniciaEspacio() {
 
-	matriz.resize(tamano);
-	for (int i = 0; i < tamano; ++i) {
-		matriz[i].resize(tamano);
+	cambios = new int[tam*tam];
+	infectados = new int[tam*tam];
+
+	int tamTotal = 3 * cantidadP;
+	personas = new int[tamTotal];
+
+	// Insercion de personas
+	int j = cantInfectada;
+	for (int i = 0; j > 0; i += 3) {
+		int x = rand() % (tam*tam);
+		personas[i] = x;
+		++cambios[x];                   // Posicion
+		personas[i + 1] = INFECTADA;         // Estado
+		personas[i + 2] = ticsMuerte;        // Tics
+		--j;
 	}
-
-	// Insercion de las Personas
-	int pInfectadas = cantInfectada;
-	int pSaludables = cantidadP - pInfectadas;
-
-	for (int k = 0; k < pSaludables; ++k) {
-		Persona* p = new Persona();
-		// Inicializar datos de las Persona p Saludable
-		p->setEstado(Susceptible);
-		// Escoger PosiciÃ³n aleatoria
-		randomInt1 = rand() % tamano;
-		randomInt2 = rand() % tamano;
-		matriz[randomInt1][randomInt2].push_back(*p);
-		tSusceptibles++;
-	}
-
-	for (int k = 0; k < pInfectadas; ++k) {
-		Persona* p = new Persona();
-		// Inicializar datos de las Persona p Infectada
-		p->setEstado(Infectada);
-		// Escoger PosiciÃ³n aleatoria
-		randomInt1 = rand() % tamano;
-		randomInt2 = rand() % tamano;
-		matriz[randomInt1][randomInt2].push_back(*p);
-		tInfectadas++;
+	j = cantidadP - cantInfectada;
+	for (int i = cantInfectada * 3; j > 0; i += 3) {
+		int x = rand() % (tam*tam);
+		personas[i] = x;
+		personas[i + 1] = SUSCEPTIBLE;
+		personas[i + 2] = 0;
+		--j;
 	}
 
 }
 
-
-string Simulador::actualizarMatriz() {
-	steady_clock::time_point t1 = steady_clock::now();
-	steady_clock::time_point t2 = steady_clock::now();
-	int tics = 0;
-
-	// Reiniciamos los contadores de cantidad de personas en cada estado
-	while (tInfectadas != 0) {
-		t1 = steady_clock::now();
-
-		tMuertas = 0;
-		tRecuperadas = 0;
-		tInfectadas = 0;
-		tSusceptibles = 0;
-		int infectadas = 0;
-
-		// Recorrido actualizando la posicion de las personas
-#pragma omp parallel for num_threads(hilos)
-		for (int i = 0; i < tamano; ++i) {
-			for (int j = 0; j < tamano; ++j) {
-				for (int y = 0; y < matriz[i][j].size(); ++y) {
-					moverPersonas(i, j, y);
+void actualizarEstado() {
+	// I EMPIEZA EN ESTADO
+	for (int i = 1; i < cantidadP * 3; i += 3) {
+		switch (personas[i]) {
+		case INFECTADA: {
+			if (personas[i + 1] < 1) {
+				if ((rand() % 100) < probaRecu) {
+					cout << "SE RECUPERO UNA PERSONA INFECTADA" << endl << endl;
+					personas[i] = RECUPERADA;
+					nRecuperadas++;
 				}
-			}
-		}
-
-		// Recorrrido actualizando el estado de las personas
-#pragma omp parallel for num_threads(hilos)
-		for (int i = 0; i < tamano; ++i) {
-			for (int j = 0; j < tamano; ++j) {
-				infectadas = personasInfectadas(i, j);
-				for (int y = 0; y < matriz[i][j].size(); ++y) {
-					actualizarEstado(i, j, y, infectadas);
+				else {
+					cout << "SE MURIO UNA PERSONA INFECTADA" << endl << endl;
+					personas[i] = MUERTA;
+					nMuertas++;
 				}
-			}
-		}
-
-		++tics;
-		output += "\n\nTIC#: " + to_string(tics);
-		output += "\nSUSCEPTIBLES \nPromedio: " + to_string(tSusceptibles / tics) + " / Porcentaje: " + to_string((tSusceptibles * 100) / cantidadP) + "% / Cantidad: " + to_string(tSusceptibles);
-		output += "\nINFECTADAS: \nPromedio: " + to_string(tInfectadas / tics) + " / Porcentaje: " + to_string((tInfectadas * 100) / cantidadP) + "% / Cantidad: " + to_string(tInfectadas);
-		output += "\nRECUPARADAS: \nPromedio: " + to_string(tRecuperadas / tics) + " / Porcentaje: " + to_string((tRecuperadas * 100) / cantidadP) + "% / Cantidad: " + to_string(tRecuperadas);
-		output += "\nMUERTAS: \nPromedio: " + to_string(tMuertas / tics) + " / Porcentaje: " + to_string((tMuertas * 100) / cantidadP) + "% / Cantidad: " + to_string(tMuertas);
-		t2 = steady_clock::now();
-		duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
-		output += "\nDuracion de Tic: " + to_string(time_span.count()) + "s";
-		duracion += time_span.count();
-	}
-	output += "\n\nTics totales: " + to_string(tics);
-	output += "\nDuracion por tic: " + to_string(duracion / tics) + "s";
-	return output;
-}
-
-// Cuenta el numero de personas infectadas en la lista
-int Simulador::personasInfectadas(int i, int j) {
-	list<Persona>::iterator it;
-	Estado estado;
-	int nInfectadas = 0;
-	for (int y = 0; y < matriz[i][j].size(); ++y) {
-		if (matriz[i][j][y].getEstado() == Infectada) {
-			nInfectadas++;
-		}
-	}
-	return nInfectadas;
-}
-
-// Actualiza el estado de la persona de acuerdo a la cantidad de peprsonas infectadas
-// Se utiliza el pragma omp atomic para evitar conflictos con los contadores
-void Simulador::actualizarEstado(int i, int j, int y, int inf) {
-	Estado est = matriz[i][j][y].getEstado();
-	switch (est) {
-	case Infectada: {
-		if (matriz[i][j][y].getTiempoInfectado() >= ticsMuerte) {
-			random_device rd;
-			int randomInt1 = rd() % 100;
-			if (randomInt1 < probaRecu) {
-				matriz[i][j][y].setEstado(Recuperada);
-				matriz[i][j][y].resetTiempo();
-#pragma omp atomic 
-				tRecuperadas++;
+				cambios[personas[i - 1]]--;
 			}
 			else {
-				matriz[i][j][y].setEstado(Muerta);
-				tMuertas++;
+				personas[i + 1]--;
+				nInfectadas++;
 			}
+			break;
 		}
-		else {
-			matriz[i][j][y].addTiempo();
-#pragma omp atomic 
-			tInfectadas++;
-		}
-		break;
-	}
-	case Susceptible: {
-		random_device rd;
-		int randomInt2 = rd() % 100;
-		bool infectada = false;
-		for (int g = 0; g < inf; g++) {
-			if (randomInt2 < cantInfectada) {
-				infectada = true;
+		case SUSCEPTIBLE: {
+			default_random_engine generator;
+			binomial_distribution<int> distribution(infectados[personas[i - 1]], potenciaVirus / 100);
+			if (distribution(generator)) {
+				cout << "SE INFECTO UNA PERSONA SUSCEPTIBLE" << endl << endl;
+				personas[i] = INFECTADA;
+				cambios[personas[i - 1]]++;
+				personas[i + 1] = ticsMuerte;
+				nInfectadas++;
 			}
+			else {
+				nSusceptibles++;
+			}
+			break;
 		}
-		if (infectada) {
-			matriz[i][j][y].setEstado(Infectada);
-#pragma omp atomic 
-			tInfectadas++;
-
 		}
-		else {
-#pragma omp atomic 
-			tSusceptibles++;
+	}
+}
+
+// Antonio
+void actualizarMatriz() {
+	int tics = 0;
+	int random = 0;
+	int indice = 0;
+	while (nInfectadas > 0) { //While de los tic
+		++tics;
+		nInfectadas = 0;
+		nSusceptibles = 0;
+
+		// Cambiar Posicion de Personas
+		for (int i = 0; i < cantidadP * 3; i += 3) {
+			random = rand() % 4;
+			switch (random) {
+			case 0: {
+				indice = personas[i] + 1;
+				break;
+			}
+			case 1: {
+				indice = personas[i] - 1;
+				break;
+			}
+			case 2: {
+				indice = personas[i] + tam;
+				break;
+			}
+			case 3: {
+				indice = personas[i] - tam;
+				break;
+			}
+			}
+			// Si resulta que x es menor a 0 o mayor al tam
+			if (random < 2) {
+				if (indice < 0) {
+					indice = tam - 1;
+				}
+				else if (indice >= (tam*tam)) {
+					indice = (tam*tam) - tam;
+				}
+				// Si resulta que y es menor a 0 o mayor al tam
+			}
+			else {
+				if (indice < 0) {
+					indice = (tam*tam) + indice;
+				}
+				else if (indice >= (tam*tam)) {
+					indice = (indice - (tam*tam));
+				}
+			}
+			if (personas[i + 1] == INFECTADA) {
+				cambios[personas[i]]--;
+				cambios[indice]++;
+			}
+			personas[i] = indice;
 		}
-		break;
+
+
+    // COMUNICACION
+		for (int z = 0; z < tam*tam; z++) {
+			infectados[z] += cambios[z];
+		}
+
+		actualizarEstado();
+		print();
 	}
-	case Muerta: {
-#pragma omp atomic 
-		tMuertas++;
-		break;
-	}
-	case Recuperada: {
-#pragma omp atomic 
-		tRecuperadas++;
-		break;
-	}
-	}
+	// Cambiar Estado de las personas
+
 }
 
-// Cambia de posicion a la persona
-void Simulador::moverPersonas(int i, int j, int y) {
-	int indice;
-	int random;
-	random_device rd;
-	Persona p = matriz[i][j][y];
-	random = rd() % 4;
-	switch (random) {
+void obt_args(
+	char*    argv[]        /* in  */,
+	int&     cantidadP /* out */, int& potenciaVirus, int& probaRecu, int& ticsMuerte, int& cantInfectada, int& tam) {
 
-	case 0: {
-		indice = i + 1;
-		break;
-	}
-	case 1: {
-		indice = i - 1;
-		break;
-	}
-	case 2: {
-		indice = j + 1;
-		break;
-	}
-	case 3: {
-		indice = j - 1;
-		break;
-	}
-	}
-	if (indice < 0) {
-		indice = tamano - 1;
-	}
-	else if (indice >= tamano) {
-		indice = 0;
-	}
-	matriz[i][j].erase(matriz[i][j].begin() + y);
-	if (random < 2) {
-		matriz[indice][j].push_back(p);
-	}
-	else {
-		matriz[i][indice].push_back(p);
-	}
-}
+	cantidadP = strtol(argv[1], NULL, 10); // se obtiene valor del argumento 1 pasado por "línea de comandos".
+	potenciaVirus = strtol(argv[2], NULL, 10);
+	probaRecu = strtol(argv[3], NULL, 10);
+	ticsMuerte = strtol(argv[4], NULL, 10);
+	cantInfectada = strtol(argv[5], NULL, 10);
+	tam = strtol(argv[6], NULL, 10);
 
-// Set cantidad de Hilos 
-void Simulador::setHilos(int n) {
-	if (n > 0) {
-		hilos = n;
-	}
-	else {
-		hilos = omp_get_max_threads();
-	}
-}
-
-int Simulador::getHilos() {
-	return hilos;
-}
+}  /* obt_args */
