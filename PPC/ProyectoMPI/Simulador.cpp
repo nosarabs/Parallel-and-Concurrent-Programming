@@ -72,20 +72,18 @@ int main(int argc, char* argv[]) {
 
 	obt_args(argv, cantidadP, potenciaVirus, probaRecu, ticsMuerte, cantInfectada, tam);
 
-	if (mid == 0) {
-		local_start = MPI_Wtime();
-	}
+	local_start = MPI_Wtime();
 
 	init();
 	iniciaEspacio(mid, cnt_proc);
 	print();
 	actualizarMatriz(mid);
 
-	if (mid == 0) {
+	local_finish = MPI_Wtime();
+	local_elapsed = local_finish - local_start;
+	MPI_Reduce(&local_elapsed, &elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
-		local_finish = MPI_Wtime();
-		local_elapsed = local_finish - local_start;
-		MPI_Reduce(&local_elapsed, &elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+	if (mid == 0) {
 
 		output += "\n\nTiempo Total transcurrido = " + to_string(elapsed) + "s";
 		output += "\nTiempo promedio por Tic: = " + to_string(elapsed / tics) + "s";
@@ -95,8 +93,6 @@ int main(int argc, char* argv[]) {
 		out.close();
 
 		cout << output << endl; //Editar
-		int n;
-		cin >> n;
 	}
 
 	if (mid == 0)
@@ -108,17 +104,10 @@ int main(int argc, char* argv[]) {
 }
 
 void print() {
-	output += "\nInfectadas: " + to_string(nInfectadas);
-	output += "\nSusceptibles: " + to_string(nSusceptibles);
-	output += "\nMuertas: " + to_string(nMuertas);
-	output += "\nRecuperadas: " + to_string(nRecuperadas);
-
-	//for (int i = 0; i < cantidadP * 3; i += 3) {
-	//	std::cout << " P: ";
-	//	cout << personas[i] << " | ";
-	//	cout << personas[i + 1] << " | ";
-	//	cout << personas[i + 2] << endl;
-	//}
+	output += "\nInfectadas: " + to_string(nInfectadas2);
+	output += "\nSusceptibles: " + to_string(nSusceptibles2);
+	output += "\nMuertas: " + to_string(nMuertas2);
+	output += "\nRecuperadas: " + to_string(nRecuperadas2);
 }
 
 void init() {
@@ -142,6 +131,7 @@ void init() {
 
 	cantInfectada = cantidadP * cantInfectada / 100;
 	nInfectadas = cantInfectada;
+	nInfectadas2 = cantInfectada;
 	nSusceptibles = cantidadP - cantInfectada;
 
 }
@@ -157,6 +147,7 @@ void iniciaEspacio(int mid, int cnt_procesos) {
 	for (int i = 0; i < tam*tam; i++) {
 		infectados[i] = 0;
 		cambios[i] = 0;
+		cambios2[i] = 0;
 	}
 
 	int tamTotal = 3 * cantidadP;
@@ -240,13 +231,11 @@ void actualizarMatriz(int mid) {
 	int random = 0;
 	int indice = 0;
 
-	while (nInfectadas > 0) { //While de los tic
+	while (nInfectadas2 > 0) { //While de los tic
 
-		if (mid == 0) {
-			output += "#TIC: " + to_string(tics);
-			tic_start = MPI_Wtime();
-			++tics;
-		}
+		output += "#TIC: " + to_string(tics);
+		tic_start = MPI_Wtime();
+		++tics;
 
 		nInfectadas = 0;
 		nSusceptibles = 0;
@@ -301,11 +290,10 @@ void actualizarMatriz(int mid) {
 		// COMUNICACION
 
 		MPI_Barrier(MPI_COMM_WORLD);
-		MPI_Reduce(&cambios, &cambios2, tam*tam, MPI_INT, MPI_SUM, mid, MPI_COMM_WORLD);
-		
+		MPI_Allreduce(cambios, cambios2, tam*tam, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
 		for (int z = 0; z < tam*tam; z++) {
-			infectados[z] += cambios2[z];
+			infectados[z] += cambios[z];
 		}
 
 		actualizarEstado();
@@ -315,19 +303,21 @@ void actualizarMatriz(int mid) {
 			cambios2[g] = 0;
 		}
 
+		tic_finish = MPI_Wtime();
+		tic_elapsed = tic_finish - tic_start;
+		MPI_Reduce(&tic_elapsed, &elapsedTic, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+		MPI_Allreduce(&nInfectadas, &nInfectadas2, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+
+		MPI_Reduce(&nSusceptibles, &nSusceptibles2, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+		MPI_Reduce(&nMuertas, &nMuertas2, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+		MPI_Reduce(&nRecuperadas, &nRecuperadas2, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
 		if (mid == 0) {
-			tic_finish = MPI_Wtime();
-			tic_elapsed = tic_finish - tic_start;
-			MPI_Reduce(&tic_elapsed, &elapsedTic, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-
-			MPI_Reduce(&nInfectadas, &nInfectadas2, 1, MPI_INT, MPI_SUM, mid, MPI_COMM_WORLD);
-			MPI_Reduce(&nSusceptibles, &nSusceptibles2, 1, MPI_INT, MPI_SUM, mid, MPI_COMM_WORLD);
-			MPI_Reduce(&nMuertas, &nMuertas2, 1, MPI_INT, MPI_SUM, mid, MPI_COMM_WORLD);
-			MPI_Reduce(&nRecuperadas, &nRecuperadas2, 1, MPI_INT, MPI_SUM, mid, MPI_COMM_WORLD);
-
 			print();
 			output += "\nTiempo transcurrido en Tic = " + to_string(elapsedTic) + "\n\n";
 		}
+
 	}
 	// Cambiar Estado de las personas
 
